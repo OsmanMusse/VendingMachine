@@ -18,13 +18,35 @@ class ViewController: UIViewController, UICollectionViewDataSource, UICollection
     @IBOutlet weak var balanceLabel: UILabel!
     @IBOutlet weak var quantityLabel: UILabel!
     @IBOutlet weak var priceLabel: UILabel!
+    
+    let vendingMachine:VendingMachine
+    var currentSelection: VendingSelection?
+    var quantityDefault = 1
+    
+    required init?(coder aDecoder: NSCoder) {
+        do {
+            let dictionary = try PlistConverter.dictionary(fromFile: "VendingInventory", ofType: "plist")
+            let inventory  = try InventoryUnarchiver.vendingInventory(fromDictionary: dictionary)
+            self.vendingMachine = FoodVendingMachine(inventory: inventory)
+        } catch let error {
+            fatalError("\(error)")
+        }
+        super.init(coder: aDecoder)
+    }
+    
 
     override func viewDidLoad() {
-        super.viewDidLoad()
+        
+       
+         super.viewDidLoad()
+        
         // Do any additional setup after loading the view, typically from a nib.
         setupCollectionViewCells()
+        
+        balanceLabel.text = "\(vendingMachine.amountDeposited)"
+        totalLabel.text = "$0.00"
     }
-
+    
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
@@ -47,15 +69,33 @@ class ViewController: UIViewController, UICollectionViewDataSource, UICollection
         collectionView.collectionViewLayout = layout
     }
     
+    // MARK: - Vending Machine
+    @IBAction func vending() {
+    
+        if let selectionFound = currentSelection {
+            do {
+                try vendingMachine.vend(quantityDefault,selectionFound)
+            } catch {
+                // FIXME: Error handling code
+            }
+        } else {
+            // FIXME: Alert User To Selection
+        }
+    }
+    
+    
+    
     // MARK: UICollectionViewDataSource
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return 12
+        return vendingMachine.selection.count
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: reuseIdentifier, for: indexPath) as? VendingItemCell else { fatalError() }
         
+        let item = vendingMachine.selection[indexPath.row]
+        cell.iconView.image = item.getImage()
         return cell
     }
     
@@ -63,6 +103,13 @@ class ViewController: UIViewController, UICollectionViewDataSource, UICollection
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         updateCell(having: indexPath, selected: true)
+        currentSelection = vendingMachine.selection[indexPath.row]
+        if let findPriceLabel = vendingMachine.inventory[currentSelection!]?.price{
+            priceLabel.text = "$\(String(findPriceLabel))"
+            totalLabel.text = "$\(findPriceLabel * Double(quantityDefault))"
+        }
+        
+    
     }
     
     func collectionView(_ collectionView: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
